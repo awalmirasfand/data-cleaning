@@ -1,0 +1,81 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --onefile --windowed --name DataCleaningApp --clean app.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataCleaningApp-exe
+          path: dist/DataCleaningApp.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DataCleaningApp-exe
+          path: ./dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Data Cleaning App v1.0.0
+          body: |
+            ## Data Cleaning App v1.0.0
+
+            Desktop GUI app for cleaning URL / domain data, removing duplicates, and classifying TLDs against accepted / rejected lists.
+
+            ### Features
+            - Dark / Light theme toggle with modern CustomTkinter UI
+            - Paste Excel columns directly or browse .xlsx / .csv files
+            - Clean Data — strips protocols, www, paths, spaces, normalizes via tldextract
+            - Remove Duplicates — drops duplicate rows by Column A (keeps first)
+            - Check TLDs — classifies each domain's TLD against your lists
+            - Bulk review window for new TLDs
+            - Persistent TLD lists (saved to ~/.data_cleaning_app/tld_config.json)
+            - Smart Excel export: Accepted + Rejected + TLD Config sheets after TLD check
+
+            ### How to Use
+            1. Download `DataCleaningApp.exe`
+            2. Run it
+            3. Paste Excel columns (Column A = website URL) or browse a .xlsx / .csv file
+            4. Click "Load Input Data"
+            5. Click operation buttons in order: Clean → Remove Duplicates → Check TLDs
+            6. Click "Download Excel" to save the result
+          files: |
+            dist/DataCleaningApp.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
